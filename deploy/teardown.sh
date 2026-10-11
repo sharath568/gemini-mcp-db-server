@@ -14,5 +14,9 @@ gcloud secrets delete mcp-db-agent-password --quiet 2>/dev/null || true
 gcloud artifacts docker images delete "${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE}" \
   --delete-tags --quiet 2>/dev/null || true
 echo "Removed $SERVICE, its setup job, secrets and images."
+if [[ -n "${SQL_INSTANCE:-}" ]]; then
+  gcloud sql instances patch "$SQL_INSTANCE" --activation-policy=NEVER --quiet >/dev/null 2>&1 && \
+    echo "Stopped Cloud SQL $SQL_INSTANCE (storage still bills; ./deploy/cloudsql.sh delete removes it)."
+fi
 echo "The agent_ro role and agent_views schema stay in the database (free). Drop them with:"
 echo "  DROP SCHEMA agent_views CASCADE; DROP ROLE agent_ro;"

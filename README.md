@@ -52,7 +52,7 @@ CI re-runs this report on every push and writes the table to the job summary. `t
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 make db          # Postgres 16 in Docker + sample shop schema + agent_ro role and views
-make test        # 41 tests: guard, tools over MCP, ADK end to end, adversarial suite
+make test        # 42 tests: guard, tools over MCP, ADK end to end, adversarial suite
 make attack      # the table above
 make serve       # MCP on http://127.0.0.1:8080/mcp
 make smoke       # in another terminal: list tools, run a query, try a DROP
@@ -97,15 +97,24 @@ Try *"revenue by channel for delivered orders"*, then *"delete last year's order
 
 ## Deploy to Cloud Run
 
-Built to sit next to the AlloyDB free trial cluster from [vertex-alloydb-rag](https://github.com/sharath568/vertex-alloydb-rag) in the same project.
+Two database options; the server doesn't care which one it talks to.
+
+**AlloyDB**, next to the free trial cluster from [vertex-alloydb-rag](https://github.com/sharath568/vertex-alloydb-rag) in the same project:
 
 ```bash
 PROJECT_ID=your-project ./deploy/deploy.sh
 ```
 
+**Cloud SQL**, the cheapest private Postgres when the AlloyDB trial isn't available (shared-core `db-f1-micro`, private IP only, about $0.01/hour while running, stopped when idle):
+
+```bash
+PROJECT_ID=your-project ./deploy/cloudsql.sh create
+PROJECT_ID=your-project SQL_INSTANCE=mcp-pg ADMIN_SECRET=mcp-db-admin-url ./deploy/deploy.sh
+```
+
 The script:
 
-1. Looks up the AlloyDB primary's private IP.
+1. Looks up the database's private IP (AlloyDB primary, or the Cloud SQL instance).
 2. Generates the `agent_ro` password and stores it, plus the agent DSN, in Secret Manager.
 3. Creates **two** service accounts: the server can read only the `agent_ro` DSN. A one-off setup job is the only thing that can read the admin DSN.
 4. Builds the image once with Cloud Build into Artifact Registry.
@@ -120,7 +129,11 @@ python examples/smoke_client.py http://127.0.0.1:8081/mcp
 gcloud logging read 'jsonPayload.component="mcp-db-server"' --limit 20
 ```
 
-**Cost:** nothing while idle. Cloud Run scales to zero, and two secrets plus one small image fit in the free tiers. `./deploy/teardown.sh` removes the service, job, secrets and images, and leaves the AlloyDB cluster alone.
+**Cost:** nothing while idle on the server side. Cloud Run scales to zero, and two secrets plus one small image fit in the free tiers. `./deploy/teardown.sh` removes the service, job, secrets and images. It leaves the database alone; with `SQL_INSTANCE` set it stops the Cloud SQL instance so only storage bills.
+
+**Measure it:** `ID_TOKEN=$(gcloud auth print-identity-token) python tools/loadtest.py https://...run.app/mcp` times the first call (cold start if the service was at zero), then runs 20 concurrent sessions and prints p50/p95 per tool.
+
+**Managed Postgres gotcha:** on Cloud SQL and AlloyDB the `postgres` user is not a true superuser, and Postgres 16 rejects any `ALTER ROLE` that names `SUPERUSER` or `REPLICATION`, even to turn them off. `sql/01_agent_access.sql` sets those only in `CREATE ROLE` and then checks them. `tests/integration/test_setup_managed_admin.py` runs the setup as a CREATEROLE-only admin so CI catches this.
 
 **Gotcha worth knowing:** the MCP Python SDK turns on DNS-rebinding protection when it binds to `127.0.0.1`. On Cloud Run that rejects the `*.run.app` Host header with **421 Misdirected Request**. The Dockerfile sets `HOST=0.0.0.0`. That's safe here because Cloud Run IAM sits in front.
 
@@ -164,8 +177,9 @@ mcp_db_server/
 examples/db_agent/         ADK agent using McpToolset + ID-token header provider
 examples/smoke_client.py   MCP client with no LLM, for checking a deploy
 tests/                     unit, integration (MCP + ADK end to end), adversarial
-deploy/                    deploy.sh, teardown.sh
+deploy/                    deploy.sh, teardown.sh, cloudsql.sh (cheap Postgres option)
 tools/report.py            block-rate tables
+tools/loadtest.py          cold start + p95 under concurrent sessions
 ```
 
 Built against `mcp` 2.3 (`MCPServer`, formerly `FastMCP`), `google-adk` 2.11, `sqlglot` 30, `psycopg` 3.3 and Postgres 16. Tested on Python 3.12 and 3.13.

@@ -24,13 +24,18 @@ COMMENT ON VIEW agent_views.orders_v      IS 'One row per order. status: placed,
 COMMENT ON VIEW agent_views.order_items_v IS 'Order lines. line_total = quantity * unit_price. Join to orders_v on order_id.';
 
 -- The login role the MCP server uses.
+-- SUPERUSER/REPLICATION are set only at creation: on Cloud SQL and AlloyDB the admin user is not a
+-- true superuser, and Postgres 16 refuses any ALTER ROLE that names those attributes.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'agent_ro') THEN
-    CREATE ROLE agent_ro LOGIN;
+    CREATE ROLE agent_ro LOGIN NOSUPERUSER NOREPLICATION;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'agent_ro' AND (rolsuper OR rolreplication OR rolbypassrls)) THEN
+    RAISE EXCEPTION 'agent_ro has SUPERUSER, REPLICATION or BYPASSRLS; drop the role and rerun';
   END IF;
 END $$;
-ALTER ROLE agent_ro WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION
+ALTER ROLE agent_ro WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT
   CONNECTION LIMIT 20 PASSWORD :agent_password;
 
 -- Nothing by default, then exactly what it needs.

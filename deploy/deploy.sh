@@ -5,15 +5,20 @@
 #
 #   PROJECT_ID=my-project ./deploy/deploy.sh
 #
-# Prereqs: the rag-cluster / rag-primary AlloyDB instance and the rag-database-url secret
-# (admin DSN) from vertex-alloydb-rag's deploy.sh. Override CLUSTER/INSTANCE/ADMIN_SECRET if yours differ.
+# Prereqs, either:
+#   - AlloyDB: the rag-cluster / rag-primary instance and the rag-database-url secret (admin DSN) from
+#     vertex-alloydb-rag's deploy.sh. Override CLUSTER/INSTANCE/ADMIN_SECRET if yours differ.
+#   - Cloud SQL: ./deploy/cloudsql.sh create, then
+#     SQL_INSTANCE=mcp-pg ADMIN_SECRET=mcp-db-admin-url PROJECT_ID=... ./deploy/deploy.sh
 set -euo pipefail
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 PROJECT_ID="${PROJECT_ID:?set PROJECT_ID}"
 REGION="${REGION:-us-central1}"
 NETWORK="${NETWORK:-default}"
 CLUSTER="${CLUSTER:-rag-cluster}"
 INSTANCE="${INSTANCE:-rag-primary}"
+SQL_INSTANCE="${SQL_INSTANCE:-}"         # set to use Cloud SQL instead of AlloyDB
 DB_NAME="${DB_NAME:-postgres}"
 ADMIN_SECRET="${ADMIN_SECRET:-rag-database-url}"
 SERVICE="${SERVICE:-mcp-db-server}"
@@ -26,12 +31,17 @@ IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE}:$(date +%Y%m
 
 gcloud config set project "$PROJECT_ID" >/dev/null
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-  secretmanager.googleapis.com alloydb.googleapis.com
+  secretmanager.googleapis.com
 
-echo "== 1. Database address (private IP of the AlloyDB primary)"
-DB_IP=$(gcloud alloydb instances describe "$INSTANCE" --cluster="$CLUSTER" --region="$REGION" \
-  --format='value(ipAddress)')
-echo "AlloyDB: $DB_IP"
+echo "== 1. Database address (private IP)"
+if [[ -n "$SQL_INSTANCE" ]]; then
+  DB_IP=$(gcloud sql instances describe "$SQL_INSTANCE" --format='value(ipAddresses[0].ipAddress)')
+  echo "Cloud SQL: $DB_IP"
+else
+  DB_IP=$(gcloud alloydb instances describe "$INSTANCE" --cluster="$CLUSTER" --region="$REGION" \
+    --format='value(ipAddress)')
+  echo "AlloyDB: $DB_IP"
+fi
 
 echo "== 2. agent_ro password + DSN in Secret Manager (generated once, reused on redeploy)"
 if ! gcloud secrets describe mcp-db-agent-password >/dev/null 2>&1; then
@@ -65,7 +75,8 @@ echo "== 4. Build the image once (used by the setup job and the service)"
 gcloud artifacts repositories describe "$AR_REPO" --location="$REGION" >/dev/null 2>&1 || \
   gcloud artifacts repositories create "$AR_REPO" --location="$REGION" --repository-format=docker \
     --labels="$LABELS"
-gcloud builds submit --tag "$IMAGE" .
+# --suppress-logs: still waits for the result, but never hangs streaming logs (seen on new projects)
+gcloud builds submit --tag "$IMAGE" --suppress-logs .
 
 NET_FLAGS=(--region="$REGION" --network="$NETWORK" --subnet=default
            --vpc-egress=private-ranges-only --labels="$LABELS")

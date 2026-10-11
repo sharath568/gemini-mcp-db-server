@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.1 (October 2026)
+
+- Fix: `agent_ro` setup failed on Cloud SQL and AlloyDB, where the admin is not a true superuser
+  (Postgres 16 rejects `ALTER ROLE ... NOSUPERUSER/NOREPLICATION` from non-superusers). Attributes are
+  now set at `CREATE ROLE` and verified; new test runs setup as a CREATEROLE-only admin.
+- `deploy/cloudsql.sh`: shared-core Cloud SQL Postgres on a private IP, with start/stop/delete;
+  `deploy.sh` takes `SQL_INSTANCE`; `teardown.sh` stops it
+- `tools/loadtest.py`: cold start plus p50/p95 per tool under concurrent MCP sessions
+- Deploy scripts never stop at gcloud prompts
+
 ## v0.1.0 (October 2026)
 
 - Read-only MCP server (`mcp` 2.x `MCPServer`, Streamable HTTP, stateless) with four tools:
