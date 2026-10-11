@@ -134,8 +134,9 @@ async def explain_query(sql: str, ctx: Context) -> dict[str, Any]:
     }
 
 
-@mcp.custom_route("/healthz", methods=["GET"])
-async def healthz(_: Request) -> JSONResponse:
+# Not /healthz: Cloud Run reserves paths ending in "z" and answers them itself with a 404.
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_: Request) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 

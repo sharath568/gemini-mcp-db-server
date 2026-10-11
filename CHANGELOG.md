@@ -9,6 +9,7 @@
   `deploy.sh` takes `SQL_INSTANCE`; `teardown.sh` stops it
 - `tools/loadtest.py`: cold start plus p50/p95 per tool under concurrent MCP sessions
 - Deploy scripts never stop at gcloud prompts
+- Health check moved from `/healthz` to `/health`: Cloud Run reserves paths ending in `z`
 
 ## v0.1.0 (October 2026)
 
