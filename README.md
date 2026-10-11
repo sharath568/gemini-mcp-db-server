@@ -145,7 +145,9 @@ gcloud logging read 'jsonPayload.component="mcp-db-server"' --limit 20
 | Legit queries allowed | 11/11 |
 | `run_query` latency, join + aggregate over 12.5k rows, local, in-process | p50 12.6 ms, p95 18.3 ms |
 | Server code (server, guard, db, safety, audit; incl. comments) | ~490 lines |
-| Cloud Run cold start and p95, 20 concurrent sessions | *to measure on first deploy* |
+| Cloud Run cold start (min-instances 0), first call incl. MCP initialize | 2.2 s and 5.3 s (two cold starts) |
+| Cloud Run, 20 concurrent sessions × 10 rounds (600 calls), warm, from a laptop over the internet | 0 errors, ~150 calls/s; `run_query` p50 130–137 ms, p95 182–204 ms |
+| Database for those numbers | Cloud SQL `db-f1-micro` (shared core), `POOL_MAX=5` × max 2 instances = at most 10 connections |
 
 ## Design notes
 
