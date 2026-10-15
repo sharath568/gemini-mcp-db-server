@@ -1,5 +1,7 @@
 # gemini-mcp-db-server
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/sharath568/gemini-mcp-db-server)](https://m8ven.ai/mcp/sharath568/gemini-mcp-db-server?s=readme)
+
 A small, read-only [MCP](https://modelcontextprotocol.io) server that lets Gemini agents query Postgres or AlloyDB without being able to hurt it. It runs on Cloud Run behind IAM, and the agent never sees a database credential.
 
 Most "connect your agent to a database" examples hand the model a superuser URL and add *"only run SELECT"* to the prompt. That isn't a control. This server stacks real ones, and each layer still holds if the one before it fails:
